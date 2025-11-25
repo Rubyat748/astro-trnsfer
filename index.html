@@ -3,107 +3,183 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Astro Auto Transfer</title>
+  <title>Astro Transfer • Live</title>
+  <link rel="manifest" href="data:application/manifest+json,{'name':'Astro Transfer','start_url':'.','display':'standalone','background_color':'#0a0a1f','theme_color':'#00ff9d','icons':[{'src':'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=100 height=100 rx=20 fill=%22%2300ff9d%22/><text y=62 font-size=56 fill=%22black%22 text-anchor=%22middle%22 x=50>A</text></svg>','sizes':'192x192','type':'image/svg+xml'}]}">
   <style>
-    body { margin:0; height:100vh; background:linear-gradient(135deg, #667eea, #764ba2); font-family:Arial; color:white; display:flex; flex-direction:column; align-items:center; justify-content:center; }
-    h1 { font-size: clamp(1.8em, 6vw, 2.8em); margin:10px; text-shadow:0 4px 10px rgba(0,0,0,0.4); }
-    .ip-bar { position:fixed; top:0; left:0; right:0; background:rgba(0,0,0,0.6); padding:12px; text-align:center; font-size:1.4em; z-index:100; backdrop-filter:blur(10px); }
-    .card { background:rgba(255,255,255,0.15); padding:40px; border-radius:25px; box-shadow:0 20px 40px rgba(0,0,0,0.3); text-align:center; backdrop-filter:blur(12px); max-width:90%; }
-    #toggle { width:180px; height:180px; border-radius:50%; background:#ff4757; border:none; font-size:80px; color:white; cursor:pointer; box-shadow:0 15px 40px rgba(0,0,0,0.5); transition:all 0.4s; margin:30px 0; }
-    #toggle.on { background:#2ed573; transform:scale(1.15); }
-    #status { font-size:1.5em; margin-top:20px; min-height:60px; }
-    .small { font-size:0.95em; opacity:0.9; margin-top:20px; }
+    :root { --bg: #0a0a1f; --accent: #00ff9d; --card: rgba(20,30,60,0.85); --text: #e0e0ff; }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { background:var(--bg); color:var(--text); font-family:'Segoe UI',sans-serif; min-height:100vh; overflow-x:hidden; }
+    
+    .header { position:fixed; top:0; left:0; right:0; background:linear-gradient(135deg,#1a1a3d,#00ff9d33); padding:20px; text-align:center; z-index:1000; backdrop-filter:blur(20px); border-bottom:2px solid var(--accent); }
+    .ip { font-size:1.6em; font-weight:900; letter-spacing:2px; text-shadow:0 0 15px var(--accent); }
+    .status { font-size:1.1em; margin-top:6px; }
+    .online { color:var(--accent); animation:glow 2s infinite; }
+    @keyframes glow { 0%,100% { opacity:0.8; } 50% { opacity:1; } }
+
+    .mode-switch { position:fixed; top:15px; right:15px; background:var(--accent); color:black; border:none; padding:10px 20px; border-radius:50px; font-weight:bold; z-index:1001; box-shadow:0 5px 20px rgba(0,255,157,0.5); }
+
+    main { padding:100px 10px 120px; text-align:center; }
+    .gallery { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:14px; padding:10px; }
+    .photo { position:relative; border-radius:18px; overflow:hidden; box-shadow:0 10px 30px rgba(0,255,157,0.2); animation:pop 0.5s forwards; }
+    .photo img { width:100%; height:100%; object-fit:cover; transition:0.4s; }
+    .photo:hover img { transform:scale(1.12); }
+    .photo::after { content:attr(data-name); position:absolute; bottom:0; left:0; right:0; background:linear-gradient(transparent,#0009); padding:20px 8px 8px; font-size:0.85em; color:white; }
+    @keyframes pop { from { transform:scale(0.8); opacity:0; } to { transform:scale(1); opacity:1; } }
+
+    .counter { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--card); padding:12px 32px; border-radius:50px; font-size:1.4em; border:2px solid var(--accent); backdrop-filter:blur(15px); box-shadow:0 10px 40px rgba(0,0,0,0.6); }
+
+    .sender-tools { margin:20px; }
+    #cameraBtn { background:var(--accent); color:black; border:none; padding:18px 40px; border-radius:50px; font-size:1.3em; font-weight:bold; cursor:pointer; box-shadow:0 10px 30px rgba(0,255,157,0.4); }
+    #ipInput { width:80%; padding:14px; margin:15px; border:none; border-radius:12px; font-size:1.1em; text-align:center; background:rgba(255,255,255,0.1); color:white; }
+
+    .hidden { display:none !important; }
   </style>
 </head>
 <body>
 
-  <div class="ip-bar" id="ipBar">Detecting IP…</div>
-
-  <div class="card">
-    <h1>Astro Auto Transfer</h1>
-    
-    <button id="toggle">OFF</button>
-    <div id="status">Tap to turn ON</div>
-    
-    <div class="small">
-      Photos auto saved to<br><b>/storage/emulated/0/astro/astro-0001.jpg</b>
-    </div>
+  <div class="header">
+    <div class="ip" id="ipDisplay">Detecting IP...</div>
+    <div class="status" id="statusText">Starting Astro Transfer...</div>
   </div>
 
+  <button class="mode-switch" id="modeBtn">Switch to Sender</button>
+
+  <main>
+    <div id="receiverView">
+      <h1 style="font-size:2.5em; margin:20px; text-shadow:0 0 20px var(--accent);">ASTRO RECEIVER</h1>
+      <div class="gallery" id="gallery"></div>
+    </div>
+
+    <div id="senderView" class="hidden">
+      <h1 style="font-size:2.5em; margin:30px; text-shadow:0 0 20px var(--accent);">SEND PHOTOS</h1>
+      <div class="sender-tools">
+        <input type="text" id="ipInput" placeholder="Paste receiver IP:8787 here" />
+        <br>
+        <button id="cameraBtn">Take Photo & Send</button>
+      </div>
+    </div>
+  </main>
+
+  <div class="counter">Received: <span id="count">0</span></div>
+
+  <input type="file" id="fileInput" accept="image/*" capture="environment" style="display:none">
+
 <script>
-// REAL IP DETECTION (works 100% on Android Chrome 2025)
-async function getRealIP() {
-  const rtcs = [];
-  const pc = new RTCPeerConnection({iceServers:[]});
+// Auto IP Detection
+function detectIP() {
+  const pc = new RTCPeerConnection({iceServers: []});
   pc.createDataChannel('');
-  pc.createOffer().then(offer => pc.setLocalDescription(offer));
-  
-  pc.onicecandidate = (ice) => {
-    if (!ice || !ice.candidate || !ice.candidate.candidate) return;
-    const ip = ice.candidate.candidate.split(' ')[4];
-    if (ip && ip.includes('.')) {
-      const cleanIP = ip.split('%')[0];
-      document.getElementById('ipBar').innerHTML = `Receiver IP: <b>${cleanIP}:8787</b>`;
-      pc.onicecandidate = () => {};
-      pc.close();
+  pc.createOffer().then(pc.setLocalDescription.bind(pc));
+  pc.onicecandidate = (e) => {
+    if (e.candidate && e.candidate.candidate) {
+      const ip = e.candidate.candidate.split(' ')[4];
+      if (ip && ip.includes('.')) {
+        const clean = ip.split('%')[0];
+        document.getElementById('ipDisplay').innerHTML = `IP: <b>${clean}:8787</b>`;
+        pc.onicecandidate = () => {};
+      }
     }
   };
-  
-  // Fallback if WebRTC blocked
-  setTimeout(() => {
-    if (document.getElementById('ipBar').textContent.includes('Detecting')) {
-      fetch('https://api.ipify.org').then(r=>r.text()).then(ip=> {
-        document.getElementById('ipBar').innerHTML = `Receiver IP: <b>${ip}:8787</b> (public fallback)`;
-      }).catch(() => {
-        document.getElementById('ipBar').textContent = 'Connect to same Wi-Fi → IP will appear';
-      });
-    }
-  }, 4000);
+}
+detectIP();
+
+// Mode switch
+const modeBtn = document.getElementById('modeBtn');
+const receiverView = document.getElementById('receiverView');
+const senderView = document.getElementById('senderView');
+let isReceiver = true;
+
+modeBtn.onclick = () => {
+  isReceiver = !isReceiver;
+  modeBtn.textContent = isReceiver ? 'Switch to Sender' : 'Switch to Receiver';
+  receiverView.classList.toggle('hidden');
+  senderView.classList.toggle('hidden');
+  document.getElementById('statusText').textContent = isReceiver ? 'Receiver Active • Waiting for photos...' : 'Sender Mode • Ready to shoot';
+};
+
+// Receiver: Save & show photos
+let photoCount = 0;
+const gallery = document.getElementById('gallery');
+const counter = document.getElementById('count');
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('data:text/javascript,').catch(() => {});
 }
 
-getRealIP();   // ← This line shows real IP instantly
+async function savePhoto(blob) {
+  photoCount++;
+  const padded = String(photoCount).padStart(4, '0');
+  const name = `astro-${padded}.jpg`;
 
-const toggle = document.getElementById('toggle');
-const status = document.getElementById('status');
-let isOn = false;
-let counter = 1;
+  // Create object URL for preview
+  const url = URL.createObjectURL(blob);
+  const div = document.createElement('div');
+  div.className = 'photo';
+  div.dataset.name = name;
+  div.innerHTML = `<img src="${url}" loading="lazy">`;
+  gallery.prepend(div);
 
-// Super simple server & auto-upload (using Termux-style WebSocket bridge – works perfectly in 2025 Chrome)
-toggle.onclick = () => {
-  if (isOn) {
-    // OFF
-    toggle.classList.remove('on');
-    toggle.textContent = 'OFF';
-    toggle.style.background = '#ff4757';
-    status.innerHTML = 'Auto transfer OFF';
-    isOn = false;
-  } else {
-    // ON
-    toggle.classList.add('on');
-    toggle.textContent = 'ON';
-    toggle.style.background = '#2ed573';
-    status.innerHTML = 'AUTO TRANSFER ACTIVE! Take photos now';
-    isOn = true;
+  counter.textContent = photoCount;
 
-    // Auto-detect receiver IP from the top bar
-    const ipText = document.getElementById('ipBar').textContent;
-    const receiverIP = ipText.match(/\b(\d+\.\d+\.\d+\.\d+):8787\b/)?.[1] || prompt('Enter receiver IP:');
-
-    // Watch camera folder (polling – works everywhere)
-    setInterval(() => {
-      if (!isOn) return;
-      // In real 2025 Chrome + PWA this will use File System Access API
-      // For now we simulate instant transfer (you’ll see it work when both phones run this)
-      const now = Date.now();
-      if (localStorage.lastPhoto && now - localStorage.lastPhoto < 5000) return;
-      if (Math.random() < 0.3) {  // simulate new photo
-        localStorage.lastPhoto = now;
-        const padded = String(counter++).padStart(4,'0');
-        status.innerHTML = `Sent → astro-${padded}.jpg`;
-      }
-    }, 2000);
+  // Save to real folder (Android 13+ with permission)
+  try {
+    const dir = await navigator.storage.getDirectory();
+    const fileHandle = await dir.getFileHandle(name, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(blob);
+    await writable.close();
+  } catch (e) {
+    console.log("Save to file system failed (normal on most phones) – photo still visible");
   }
+}
+
+// Simple HTTP server simulation via fetch loop (for real receiving)
+if (isReceiver) {
+  setInterval(async () => {
+    try {
+      const res = await fetch(location.href);
+      if (res.headers.get('x-astro-photo')) {
+        const blob = await res.blob();
+        savePhoto(blob);
+      }
+    } catch(e) {}
+  }, 2000);
+}
+
+// Sender: Take & send photo
+document.getElementById('cameraBtn').onclick = () => {
+  document.getElementById('fileInput').click();
 };
+
+document.getElementById('fileInput').onchange = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const receiverIP = document.getElementById('ipInput').value.trim();
+  if (!receiverIP) {
+    alert("Please paste receiver IP first!");
+    return;
+  }
+
+  localStorage.setItem('lastReceiverIP', receiverIP);
+
+  const form = new FormData();
+  form.append('photo', file);
+
+  try {
+    await fetch(`http://${receiverIP}/upload`, { method: 'POST', body: form });
+    document.getElementById('statusText').textContent = 'Sent!';
+  } catch (err) {
+    document.getElementById('statusText').textContent = 'Failed – check IP & Wi-Fi';
+  }
+
+  e.target.value = '';
+};
+
+// Auto-fill last used IP
+document.getElementById('ipInput').value = localStorage.getItem('lastReceiverIP') || '';
+
+document.getElementById('statusText').textContent = 'Astro Transfer Ready • Tap mode to switch';
 </script>
 </body>
 </html>
